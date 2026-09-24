@@ -1,6 +1,6 @@
 {
   "name": "jev-flaky-detective",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Classify test failures as regression, flaky, environment, or unknown with Jev — without auto-rerunning or masking results.",
   "private": true,
   "type": "module",
