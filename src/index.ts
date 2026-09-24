@@ -2,6 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import { loadEvidence } from './collectors/load.js';
 import { loadJevConfig } from './collectors/config.js';
+import { listChangedPaths } from './collectors/changed-paths.js';
 import {
   createOctokitHistoryClient,
   fetchGithubTestHistory,
@@ -73,8 +74,42 @@ async function main(): Promise<void> {
   const token = core.getInput('github_token') || process.env.GITHUB_TOKEN || '';
   const octokit = token ? github.getOctokit(token) : null;
 
-  let history = loaded.history;
+  let changedPaths = loaded.changedPaths;
   const reasonCodes = [...loaded.reasonCodes];
+  if (changedPaths.length === 0 && github.context.eventName === 'pull_request' && octokit) {
+    try {
+      const pullNumber = Number(github.context.payload.pull_request?.number);
+      changedPaths = await listChangedPaths(
+        {
+          async listPullFiles(owner, repo, pull) {
+            const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: pull,
+              per_page: 100,
+            });
+            return files.map(file => file.filename);
+          },
+        },
+        github.context.repo.owner,
+        github.context.repo.repo,
+        pullNumber,
+      );
+      if (changedPaths.length > 0) reasonCodes.push('CHANGED_PATHS_FROM_PR');
+      else reasonCodes.push('NO_CHANGED_PATHS');
+    } catch (error) {
+      reasonCodes.push('CHANGED_PATHS_UNKNOWN');
+      core.warning(
+        failMessage(
+          `Could not list pull request files: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      );
+    }
+  } else if (changedPaths.length === 0) {
+    reasonCodes.push('NO_CHANGED_PATHS');
+  }
+
+  let history = loaded.history;
   if (boolInput('fetch_github_history', false)) {
     if (!octokit) {
       loaded.sourceErrors.push({ source: 'github-history', message: 'github_token is required' });
@@ -173,7 +208,7 @@ async function main(): Promise<void> {
     workspace,
     current: loaded.current,
     history,
-    changedPaths: loaded.changedPaths,
+    changedPaths,
     sourceErrors: loaded.sourceErrors,
     adapterSources: loaded.adapterSources,
     baseReasonCodes: reasonCodes,

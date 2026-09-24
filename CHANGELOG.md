@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.1]
+
+### Added
+
+* Auto-load PR changed paths via the GitHub API when `changed_paths` is omitted on `pull_request` events (`CHANGED_PATHS_FROM_PR`).
+
 ## [0.2.0]
 
 ### Added
