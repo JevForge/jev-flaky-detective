@@ -1,0 +1,27 @@
+name: Flaky Detective (JUnit)
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  actions: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests (example)
+        run: echo "produce reports/junit.xml in your real workflow"
+      - name: Classify with JUnit adapter
+        uses: JevForge/jev-flaky-detective@v0
+        with:
+          junit_path: reports/**/*.xml
+          history_path: .jev/test-history.json
+          changed_paths: ${{ toJSON(github.event.pull_request) && '[]' || '[]' }}
+          create_check_run: 'true'
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}

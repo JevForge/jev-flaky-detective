@@ -1,0 +1,4 @@
+jev_provider: vercel-ai-gateway
+# jev_model: typesafe-ai/jev
+min_confidence: 0.7
+low_confidence_policy: warn

@@ -1,0 +1,29 @@
+name: Flaky Detective (structured results)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Classify failures
+        uses: JevForge/jev-flaky-detective@v0
+        with:
+          results_path: .jev/current-results.json
+          history_path: .jev/test-history.json
+          jev_provider: vercel-ai-gateway
+          create_check_run: 'true'
+          comment_on_github: 'true'
+          low_confidence_policy: warn
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}

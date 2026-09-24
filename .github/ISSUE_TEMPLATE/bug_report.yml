@@ -1,0 +1,22 @@
+name: Bug report
+description: Report a bug in JEV Flaky Detective
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Do not paste secrets, tokens, or full proprietary test logs.
+    validations:
+      required: true
+  - type: textarea
+    id: expect
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Action ref / version
+      placeholder: JevForge/jev-flaky-detective@v0

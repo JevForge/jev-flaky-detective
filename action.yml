@@ -1,0 +1,186 @@
+name: JEV Flaky Detective
+description: Classify failing tests as regression, flaky, environment, or unknown. Jev decides; results are never masked or auto-rerun.
+author: JevForge
+branding:
+  icon: search
+  color: yellow
+
+inputs:
+  results:
+    description: Inline JSON of current test results (TestResult[] or { results: TestResult[] }).
+    required: false
+  results_path:
+    description: Workspace path(s) to normalized results JSON. Comma/newline list or glob.
+    required: false
+  history:
+    description: Inline JSON of historical runs (HistoryRun[] or { runs: HistoryRun[] }).
+    required: false
+  history_path:
+    description: Workspace JSON of historical runs. Default .jev/test-history.json when fetch_github_history is false.
+    required: false
+    default: .jev/test-history.json
+  test_id:
+    description: Optional test id to classify. When empty, every failing (or all) current result is classified.
+    required: false
+  failing_only:
+    description: When true (default), only classify tests that failed in the current results.
+    required: false
+    default: 'true'
+  environment:
+    description: production | staging | development | test | ci | unknown.
+    required: false
+    default: ci
+  runner_os:
+    description: Optional OS label for environment evidence (linux, windows, macos, unknown).
+    required: false
+  runner_arch:
+    description: Optional architecture label (x64, arm64, unknown).
+    required: false
+  changed_paths:
+    description: JSON array or newline list of changed paths. Used as regression evidence.
+    required: false
+  junit_path:
+    description: Workspace path(s) to JUnit XML reports (pytest, Surefire, etc.). Comma/newline/glob.
+    required: false
+  jest_path:
+    description: Workspace path(s) to Jest JSON reports.
+    required: false
+  playwright_path:
+    description: Workspace path(s) to Playwright JSON reports.
+    required: false
+  vitest_path:
+    description: Workspace path(s) to Vitest JSON reports.
+    required: false
+  mocha_path:
+    description: Workspace path(s) to Mocha JSON reports.
+    required: false
+  fetch_github_history:
+    description: Fetch recent Actions check-run / workflow-job conclusions for matching test names.
+    required: false
+    default: 'false'
+  history_lookback:
+    description: Maximum historical runs to consider (1-50).
+    required: false
+    default: '20'
+  history_branch:
+    description: Limit GitHub history to this branch. Empty uses the current ref when available.
+    required: false
+  workflow_name:
+    description: Optional workflow name filter when fetch_github_history is true.
+    required: false
+  min_confidence:
+    description: Minimum Jev confidence (0-1) required to trust CLASSIFY.
+    required: false
+    default: '0.7'
+  low_confidence_policy:
+    description: fail | warn | request-review | no-op when Jev is unavailable, rejected, or below min_confidence.
+    required: false
+    default: warn
+  source_error_policy:
+    description: fail | warn when a configured report source cannot be read.
+    required: false
+    default: warn
+  jev_provider:
+    description: vercel-ai-gateway | typesafe-native | custom-compatible. No silent fallback.
+    required: false
+    default: vercel-ai-gateway
+  jev_endpoint:
+    description: HTTPS evaluate endpoint. Required for custom-compatible; optional override for typesafe-native.
+    required: false
+  jev_model:
+    description: Catalog model id for typesafe-native and custom-compatible. Gateway default is typesafe-ai/jev.
+    required: false
+  jev_config_path:
+    description: Shared Jev config path (.jev/config.yml).
+    required: false
+    default: .jev/config.yml
+  timeout_ms:
+    description: Remote Jev call timeout in milliseconds.
+    required: false
+    default: '45000'
+  max_tests:
+    description: Maximum tests preserved after merge/normalize.
+    required: false
+    default: '500'
+  max_tests_to_jev:
+    description: How many tests are sampled for a single Jev call.
+    required: false
+    default: '25'
+  comment_on_github:
+    description: Post or update an idempotent PR/issue summary comment.
+    required: false
+    default: 'false'
+  create_check_run:
+    description: Create a completed Checks API run named JEV Flaky Detective.
+    required: false
+    default: 'true'
+  write_report_artifact:
+    description: Write markdown and JSON reports under .jev/.
+    required: false
+    default: 'false'
+  structured_logs:
+    description: Emit a single JSON summary log line.
+    required: false
+    default: 'false'
+  dry_run:
+    description: Skip comments and check runs; still emit outputs.
+    required: false
+    default: 'false'
+  trust_repo_jev_endpoint:
+    description: Allow jev_endpoint from repository config to receive credentials.
+    required: false
+    default: 'false'
+  github_token:
+    description: Token for comments, check runs, and optional Actions history reads.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  decision:
+    description: CLASSIFY | ABSTAIN | REQUEST_REVIEW
+  failure_type:
+    description: Primary failure type — regression | flaky | environment | unknown
+  classifications:
+    description: JSON array of per-test classifications (test_id, failure_type, confidence, reason_codes, evidence).
+  classifications_file:
+    description: Workspace file when classifications exceed the output size limit.
+  confidence:
+    description: Aggregate confidence between 0 and 1. 0 when Jev did not evaluate.
+  reason_codes:
+    description: JSON array of stable reason codes.
+  evidence_summary:
+    description: JSON object with aggregate signals (pass_rate, flip_count, environment markers, …).
+  provisional:
+    description: true when the final decision is not a confident Jev evaluation.
+  jev_status:
+    description: evaluated | unavailable | schema_rejected
+  jev_proposed:
+    description: Failure type proposed by Jev, or empty when Jev did not evaluate.
+  needs_review:
+    description: true when request-review policy applied.
+  tests_count:
+    description: Number of tests considered after filtering.
+  failing_count:
+    description: Number of currently failing tests.
+  flaky_count:
+    description: Number classified as flaky.
+  regression_count:
+    description: Number classified as regression.
+  environment_count:
+    description: Number classified as environment.
+  unknown_count:
+    description: Number classified as unknown.
+  summary:
+    description: One-line decision summary.
+  check_status:
+    description: created | dry-run | skipped for the Checks API run.
+  report_markdown_file:
+    description: Workspace path to markdown report when write_report_artifact is true.
+  report_json_file:
+    description: Workspace path to JSON report when write_report_artifact is true.
+  jev_provider:
+    description: Provider that was asked. Never falls back silently.
+
+runs:
+  using: node24
+  main: dist/index.js

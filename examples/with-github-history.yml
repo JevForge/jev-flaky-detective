@@ -1,0 +1,27 @@
+name: Flaky Detective (GitHub Actions history)
+
+on:
+  check_suite:
+    types: [completed]
+
+permissions:
+  contents: read
+  checks: write
+  actions: read
+  pull-requests: write
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Classify using native Actions history
+        uses: JevForge/jev-flaky-detective@v0
+        with:
+          results_path: .jev/current-results.json
+          fetch_github_history: 'true'
+          history_lookback: '20'
+          workflow_name: CI
+          create_check_run: 'true'
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
