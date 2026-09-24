@@ -1,0 +1,38 @@
+name: JEV Flaky Detective — Append History
+description: Append current structured test results into a per-test history JSON file for later classification.
+author: JevForge
+branding:
+  icon: archive
+  color: yellow
+
+inputs:
+  results:
+    description: Inline JSON of current TestResult[] (or { results }).
+    required: false
+  results_path:
+    description: Workspace path to normalized results JSON.
+    required: false
+  history_path:
+    description: History file to update.
+    required: false
+    default: .jev/test-history.json
+  max_runs:
+    description: Maximum history runs to retain (oldest dropped).
+    required: false
+    default: '50'
+  run_id:
+    description: History run id. Defaults to GITHUB_RUN_ID.
+    required: false
+  conclusion:
+    description: Optional run conclusion (success|failure|cancelled|skipped|unknown).
+    required: false
+
+outputs:
+  history_path:
+    description: Absolute workspace path to the updated history file.
+  runs:
+    description: Number of history runs retained after append.
+
+runs:
+  using: node24
+  main: ../dist/append-history.js

@@ -1,0 +1,36 @@
+name: Append history then classify
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pretend current results exist
+        run: |
+          mkdir -p .jev
+          echo '[{"test_id":"login","name":"login","status":"failed","error_message":"timeout"}]' > .jev/current-results.json
+
+      - name: Append into per-test history
+        uses: JevForge/jev-flaky-detective/append-history@v0
+        with:
+          results_path: .jev/current-results.json
+          history_path: .jev/test-history.json
+          conclusion: failure
+
+      - id: flaky
+        uses: JevForge/jev-flaky-detective@v0
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        with:
+          results_path: .jev/current-results.json
+          history_path: .jev/test-history.json
+          create_check_run: 'true'
+          dry_run: 'true'
