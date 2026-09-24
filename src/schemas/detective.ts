@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   DECISIONS,
+  DECISION_MODES,
   ENVIRONMENTS,
   FAILURE_TYPES,
   JEV_PROVIDERS,
@@ -106,6 +107,7 @@ export const RunOptionsSchema = z.object({
   write_report_artifact: z.boolean().default(false),
   structured_logs: z.boolean().default(false),
   dry_run: z.boolean().default(false),
+  decision_mode: z.enum(DECISION_MODES).default('jev'),
 });
 export type RunOptions = z.infer<typeof RunOptionsSchema>;
 

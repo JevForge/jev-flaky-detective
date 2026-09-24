@@ -12,7 +12,7 @@ import { emitOutputs } from './github/outputs.js';
 import { MARKER } from './executors/comment.js';
 import { parseProviderId, runDetective } from './run.js';
 import type { LowConfidencePolicy, SourceErrorPolicy } from './schemas/enums.js';
-import { LOW_CONFIDENCE_POLICIES, SOURCE_ERROR_POLICIES, ENVIRONMENTS } from './schemas/enums.js';
+import { LOW_CONFIDENCE_POLICIES, SOURCE_ERROR_POLICIES, ENVIRONMENTS, DECISION_MODES } from './schemas/enums.js';
 import { assertModelId } from './utils/endpoint.js';
 
 const LOG_PREFIX = '[JEV Flaky Detective]';
@@ -226,6 +226,7 @@ async function main(): Promise<void> {
       test_id: core.getInput('test_id') || undefined,
       min_confidence:
         numInput('min_confidence', config.min_confidence ?? 0.7),
+      decision_mode: enumInput('decision_mode', DECISION_MODES, 'jev'),
       low_confidence_policy: enumInput(
         'low_confidence_policy',
         LOW_CONFIDENCE_POLICIES,
