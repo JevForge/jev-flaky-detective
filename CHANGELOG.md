@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added
+
+* Stable error fingerprints built from normalized error type, message, and stack frames; explicit fingerprint reason codes are included in evidence.
+* Public per-test and aggregate `heuristic_failure_type`, `heuristic_confidence`, and signal-only `suggested_action` outputs.
+* Per-report size limits, stronger redaction for URL credentials, sensitive query parameters, bearer tokens, and connection strings.
+* Adapter enrichment for nested JUnit suites, Jest pending/snapshot metadata, Playwright retries/native flaky outcomes, and Vitest reporter metadata.
+* Opt-in structured telemetry fields for duration, adapter sources, history runs, and provisional state.
+* Canonical `TestResult` JSON Schema/example and YAML contract tests for workflow examples.
+
+### Changed
+
+* Onboarding examples explicitly use `dry_run: 'true'`; production defaults remain backward-compatible.
+
 ## [0.2.2]
 
 ### Added

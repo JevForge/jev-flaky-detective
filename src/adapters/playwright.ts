@@ -3,6 +3,7 @@ import { toTestResult } from './common.js';
 
 interface PlaywrightTest {
   title?: string;
+  outcome?: string;
   results?: Array<{
     status?: string;
     duration?: number;
@@ -34,6 +35,11 @@ function walkSuite(suite: PlaywrightSuite, results: TestResult[], parent: string
     for (const test of spec.tests ?? []) {
       const last = test.results?.[test.results.length - 1];
       const status = last?.status ?? 'unknown';
+      const retries = Math.max(0, ...(test.results ?? []).map(result => result.retry ?? 0));
+      const tags = [
+        test.outcome === 'flaky' ? 'playwright:flaky' : undefined,
+        retries > 0 ? `playwright:retries:${retries}` : undefined,
+      ].filter((tag): tag is string => Boolean(tag));
       results.push(
         toTestResult({
           name: test.title ?? spec.title ?? 'unnamed',
@@ -43,7 +49,9 @@ function walkSuite(suite: PlaywrightSuite, results: TestResult[], parent: string
           duration_ms: last?.duration,
           error_message: last?.error?.message,
           stack_snippet: last?.error?.stack,
-          retries: last?.retry,
+          retries,
+          attempt: typeof last?.retry === 'number' ? last.retry + 1 : undefined,
+          tags,
           source: 'playwright',
         }),
       );

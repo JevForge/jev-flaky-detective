@@ -1,0 +1,16 @@
+{
+  "test_id": "auth/login › rejects expired session",
+  "name": "rejects expired session",
+  "suite": "auth/login",
+  "file": "tests/auth/login.test.ts",
+  "status": "failed",
+  "duration_ms": 182,
+  "error_type": "AssertionError",
+  "error_message": "expected status 401, received 500",
+  "stack_snippet": "AssertionError: expected status 401, received 500\n    at tests/auth/login.test.ts:42:7",
+  "retries": 0,
+  "attempt": 1,
+  "tags": ["unit"],
+  "timestamp": "2026-09-24T12:00:00Z",
+  "source": "jest"
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/JevForge/jev-flaky-detective/test-result.schema.json",
+  "title": "JEV Flaky Detective TestResult",
+  "description": "Canonical normalized result accepted by the JEV Flaky Detective action.",
+  "$defs": {
+    "TestResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["test_id", "status"],
+      "properties": {
+        "test_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "suite": { "type": "string", "maxLength": 1024 },
+        "file": { "type": "string", "maxLength": 1024 },
+        "status": { "enum": ["passed", "failed", "skipped", "timedOut", "interrupted", "unknown"] },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "error_message": { "type": "string", "maxLength": 4000 },
+        "error_type": { "type": "string", "maxLength": 256 },
+        "stack_snippet": { "type": "string", "maxLength": 4000 },
+        "retries": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "attempt": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "tags": { "type": "array", "maxItems": 32, "items": { "type": "string", "maxLength": 64 } },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "source": { "type": "string", "maxLength": 64 }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/TestResult" },
+    { "type": "array", "maxItems": 5000, "items": { "$ref": "#/$defs/TestResult" } }
+  ]
+}

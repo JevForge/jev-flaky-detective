@@ -33,6 +33,7 @@ jobs:
           history_path: .jev/test-history.json
           create_check_run: 'true'
           low_confidence_policy: warn
+          dry_run: 'true'
 
       - name: Use failure_type
         if: always()

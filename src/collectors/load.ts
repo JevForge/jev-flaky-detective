@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import {
   parseJestJson,
   parseJunitXml,
@@ -23,6 +23,7 @@ export interface LoadInput {
   vitestPath?: string;
   mochaPath?: string;
   changedPathsRaw?: string;
+  maxReportBytes?: number;
 }
 
 export interface LoadResult {
@@ -52,12 +53,21 @@ function parseChangedPaths(raw: string | undefined): string[] {
     .slice(0, 2000);
 }
 
-function readJsonFile(workspace: string, relative: string): unknown {
+function readBoundedText(file: string, maxReportBytes: number): string {
+  const size = statSync(file).size;
+  if (size > maxReportBytes) {
+    throw new Error(`report exceeds the maximum report size of ${maxReportBytes} bytes`);
+  }
+  return readFileSync(file, 'utf8');
+}
+
+function readJsonFile(workspace: string, relative: string, maxReportBytes: number): unknown {
   const full = assertInsideWorkspace(workspace, relative);
-  return JSON.parse(readFileSync(full, 'utf8')) as unknown;
+  return JSON.parse(readBoundedText(full, maxReportBytes)) as unknown;
 }
 
 export function loadEvidence(input: LoadInput): LoadResult {
+  const maxReportBytes = input.maxReportBytes ?? 10 * 1024 * 1024;
   const sourceErrors: SourceError[] = [];
   const adapterSources: string[] = [];
   const reasonCodes: ReasonCode[] = [];
@@ -65,6 +75,9 @@ export function loadEvidence(input: LoadInput): LoadResult {
 
   if (input.resultsInline?.trim()) {
     try {
+      if (Buffer.byteLength(input.resultsInline, 'utf8') > maxReportBytes) {
+        throw new Error(`report exceeds the maximum report size of ${maxReportBytes} bytes`);
+      }
       groups.push(parseResultsPayload(input.resultsInline));
     } catch (error) {
       sourceErrors.push({
@@ -82,7 +95,7 @@ export function loadEvidence(input: LoadInput): LoadResult {
         continue;
       }
       for (const file of files) {
-        groups.push(parseResultsPayload(JSON.parse(readFileSync(file, 'utf8'))));
+        groups.push(parseResultsPayload(JSON.parse(readBoundedText(file, maxReportBytes))));
       }
     } catch (error) {
       sourceErrors.push({
@@ -120,7 +133,7 @@ export function loadEvidence(input: LoadInput): LoadResult {
     }
     for (const file of files) {
       try {
-        groups.push(adapter.parse(readFileSync(file, 'utf8')));
+        groups.push(adapter.parse(readBoundedText(file, maxReportBytes)));
         if (!adapterSources.includes(adapter.label)) adapterSources.push(adapter.label);
         if (!reasonCodes.includes(adapter.code)) reasonCodes.push(adapter.code);
       } catch (error) {
@@ -148,7 +161,7 @@ export function loadEvidence(input: LoadInput): LoadResult {
     try {
       const full = assertInsideWorkspace(input.workspace, input.historyPath);
       if (existsSync(full)) {
-        history = parseHistoryPayload(readJsonFile(input.workspace, input.historyPath));
+        history = parseHistoryPayload(readJsonFile(input.workspace, input.historyPath, maxReportBytes));
         reasonCodes.push(history.length > 0 ? 'HISTORY_AVAILABLE' : 'HISTORY_EMPTY');
       } else {
         reasonCodes.push('HISTORY_EMPTY');

@@ -35,6 +35,7 @@ jobs:
           create_check_run: 'true'
           low_confidence_policy: warn
           write_report_artifact: 'true'
+          dry_run: 'true'
 
       - name: Flake triage
         if: always() && steps.flaky.outputs.failure_type == 'flaky'

@@ -21,6 +21,13 @@ describe('adapters', () => {
     expect(results.find(r => r.name === 'skip')?.status).toBe('skipped');
   });
 
+  it('keeps nested JUnit suite identity', () => {
+    const results = parseJunitXml(
+      '<testsuites><testsuite name="outer"><testsuite name="inner"><testcase name="nested" time="0.01"/></testsuite></testsuite></testsuites>',
+    );
+    expect(results[0]?.suite).toBe('outer â€º inner');
+  });
+
   it('parses Jest JSON', () => {
     const results = parseJestJson({
       testResults: [
@@ -40,6 +47,16 @@ describe('adapters', () => {
       ],
     });
     expect(results.map(r => r.status)).toEqual(['passed', 'failed']);
+  });
+
+  it('preserves Jest pending and snapshot metadata as tags', () => {
+    const results = parseJestJson({
+      numPendingTests: 1,
+      snapshot: { unmatched: 2, added: 1, updated: 3 },
+      testResults: [{ name: 'a.test.js', assertionResults: [{ fullName: 'pending', status: 'pending' }] }],
+    });
+    expect(results[0]?.status).toBe('skipped');
+    expect(results[0]?.tags).toEqual(expect.arrayContaining(['jest:pending-tests:1', 'jest:snapshot-unmatched:2']));
   });
 
   it('parses Mocha / Vitest / Playwright shapes', () => {
@@ -64,5 +81,25 @@ describe('adapters', () => {
         ],
       })[0]?.status,
     ).toBe('timedOut');
+  });
+
+  it('records Playwright retries and native flaky outcome', () => {
+    const results = parsePlaywrightJson({
+      suites: [{ title: 'root', specs: [{ title: 'spec', tests: [{ title: 't', outcome: 'flaky', results: [
+        { status: 'failed', retry: 0, duration: 10, error: { message: 'first' } },
+        { status: 'passed', retry: 1, duration: 12 },
+      ] }] }] }],
+    });
+    expect(results[0]?.status).toBe('passed');
+    expect(results[0]?.retries).toBe(1);
+    expect(results[0]?.tags).toContain('playwright:flaky');
+  });
+
+  it('accepts Vitest JSON reporter metadata alongside Jest-compatible results', () => {
+    const results = parseVitestJson({
+      testResults: [{ name: '/repo/a.test.ts', assertionResults: [{ fullName: 'a > works', status: 'passed', meta: { shard: '1' } }] }],
+    });
+    expect(results[0]?.file).toBe('/repo/a.test.ts');
+    expect(results[0]?.tags).toContain('vitest:meta:shard');
   });
 });

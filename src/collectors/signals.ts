@@ -1,5 +1,5 @@
 import type { HistoryRun, TestResult, TestSignals } from '../schemas/detective.js';
-import { digestError } from '../utils/sanitize.js';
+import { fingerprintTestResult } from '../utils/sanitize.js';
 import { toPosix } from '../utils/paths.js';
 
 const ENV_MARKERS: Array<{ code: string; pattern: RegExp }> = [
@@ -64,7 +64,7 @@ export function computeSignals(
     } else {
       countingConsecutive = false;
     }
-    const digest = digestError(result.error_message ?? result.stack_snippet);
+    const digest = fingerprintTestResult(result);
     if (digest) digests.push(digest);
     if (typeof result.duration_ms === 'number') durations.push(result.duration_ms);
     void fromHistory;

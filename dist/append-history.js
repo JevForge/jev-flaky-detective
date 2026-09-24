@@ -23870,6 +23870,7 @@ var SOURCE_ERROR_POLICIES = ["fail", "warn"];
 var ENVIRONMENTS = ["production", "staging", "development", "test", "ci", "unknown"];
 var JEV_STATUSES = ["evaluated", "unavailable", "schema_rejected"];
 var DECISION_MODES = ["jev", "deterministic"];
+var SUGGESTED_ACTIONS = ["triage", "ignore-for-gate", "investigate-env"];
 var REASON_CODES = [
   "CURRENT_FAILURE",
   "CURRENT_PASS",
@@ -23883,6 +23884,8 @@ var REASON_CODES = [
   "FIRST_FAILURE",
   "STABLE_ERROR_SIGNATURE",
   "CHANGING_ERROR_SIGNATURE",
+  "SAME_ERROR_FINGERPRINT",
+  "CHANGED_ERROR_FINGERPRINT",
   "ENVIRONMENT_MARKERS",
   "TIMEOUT_MARKERS",
   "RESOURCE_MARKERS",
@@ -23965,7 +23968,10 @@ var ClassificationSchema = external_exports.object({
   confidence: external_exports.number().min(0).max(1),
   reason_codes: external_exports.array(external_exports.enum(REASON_CODES)).max(24),
   evidence: TestSignalsSchema.partial().optional(),
-  error_digest: external_exports.string().max(256).optional()
+  error_digest: external_exports.string().max(256).optional(),
+  heuristic_failure_type: external_exports.enum(FAILURE_TYPES),
+  heuristic_confidence: external_exports.number().min(0).max(1),
+  suggested_action: external_exports.enum(SUGGESTED_ACTIONS)
 });
 var DetectiveDecisionSchema = external_exports.object({
   decision: external_exports.enum(DECISIONS),
@@ -23977,7 +23983,9 @@ var DetectiveDecisionSchema = external_exports.object({
   provisional: external_exports.boolean(),
   provider: external_exports.enum(JEV_PROVIDERS).optional(),
   jev_status: external_exports.enum(JEV_STATUSES),
-  jev_proposed: external_exports.enum(FAILURE_TYPES).nullable()
+  jev_proposed: external_exports.enum(FAILURE_TYPES).nullable(),
+  heuristic_failure_type: external_exports.enum(FAILURE_TYPES),
+  suggested_action: external_exports.enum(SUGGESTED_ACTIONS)
 });
 var SourceErrorSchema = external_exports.object({
   source: external_exports.string(),
@@ -23994,6 +24002,7 @@ var RunOptionsSchema = external_exports.object({
   source_error_policy: external_exports.enum(SOURCE_ERROR_POLICIES).default("warn"),
   max_tests: external_exports.number().int().positive().max(5e3).default(500),
   max_tests_to_jev: external_exports.number().int().positive().max(100).default(25),
+  max_report_size_mb: external_exports.number().positive().max(100).default(10),
   history_lookback: external_exports.number().int().positive().max(50).default(20),
   comment_on_github: external_exports.boolean().default(false),
   create_check_run: external_exports.boolean().default(true),
@@ -24011,7 +24020,8 @@ var EvidenceSummarySchema = external_exports.object({
   avg_flip_count: external_exports.number().nonnegative().nullable(),
   environment_marker_tests: external_exports.number().int().nonnegative(),
   changed_path_overlap_tests: external_exports.number().int().nonnegative(),
-  adapter_sources: external_exports.array(external_exports.string()).max(16)
+  adapter_sources: external_exports.array(external_exports.string()).max(16),
+  duration_ms: external_exports.number().nonnegative()
 });
 
 // src/utils/sanitize.ts
@@ -24020,11 +24030,21 @@ var SECRET_PATTERNS = [
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   /\bsk-[A-Za-z0-9_-]{20,}\b/g,
   /\b(AI_GATEWAY_API_KEY|TYPESAFE_API_KEY|JEV_CUSTOM_API_KEY)\s*[:=]\s*\S+/gi,
-  /\b(api[_-]?key|token|authorization|bearer)\b\s*[:=]\s*\S+/gi,
+  /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer)\b\s*[:=]\s*[^\s,;&]+/gi,
   /\bBearer\s+[A-Za-z0-9._\-+=/]{12,}/gi
 ];
 function redactSecrets(text) {
   let out = text;
+  out = out.replace(/\b(authorization)\s*[:=]\s*bearer\s+[^\s,;&]+/gi, "$1: [REDACTED]");
+  out = out.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@");
+  out = out.replace(
+    /([?&](?:access[_-]?token|api[_-]?key|auth|key|password|passwd|secret|signature|sig|token)=)[^&#\s]+/gi,
+    "$1[REDACTED]"
+  );
+  out = out.replace(
+    /((?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^\s:/]+:)[^\s/@]+(@)/gi,
+    "$1[REDACTED]$2"
+  );
   for (const pattern of SECRET_PATTERNS) {
     out = out.replace(pattern, "[REDACTED]");
   }

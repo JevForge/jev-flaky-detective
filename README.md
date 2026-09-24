@@ -19,7 +19,7 @@ A red build is not always a product regression. This Action collects current res
     create_check_run: 'true'
 ```
 
-Pin `@v0`, an exact tag such as `@v0.1.0`, or a commit SHA.
+Pin `@v0`, an exact tag such as `@v0.2.2`, or a commit SHA. The earlier docs-only `v0.1.1` release is already present in the repository history.
 
 ## Features
 
@@ -183,6 +183,8 @@ More workflows: [`examples/basic.yml`](examples/basic.yml), [`examples/with-juni
 
 Persist results between runs with the nested Action — see [docs/history-append.md](docs/history-append.md).
 
+The onboarding examples use `dry_run: 'true'` so comments and Checks API runs are skipped while outputs remain available. Change it to `'false'` only after reviewing permissions; the action default remains `false` for backward compatibility.
+
 ## Inputs
 
 | Input | Required | Default | Description |
@@ -216,6 +218,8 @@ Persist results between runs with the nested Action — see [docs/history-append
 | `timeout_ms` | no | `45000` | Remote Jev call timeout |
 | `max_tests` | no | `500` | Max tests preserved after merge |
 | `max_tests_to_jev` | no | `25` | Sample size sent to Jev |
+| `max_report_size_mb` | no | `10` | Maximum size per configured report/history file before `SOURCE_UNAVAILABLE` |
+| `decision_mode` | no | `jev` | `jev` or local-only `deterministic` |
 | `comment_on_github` | no | `false` | Post or update an idempotent PR/issue summary comment |
 | `create_check_run` | no | `true` | Create a completed Checks API run |
 | `write_report_artifact` | no | `false` | Write markdown/JSON reports under `.jev/` |
@@ -240,6 +244,8 @@ Paths must stay inside `GITHUB_WORKSPACE`. Provider credentials belong in `env`,
 | `provisional` | `true` when the result is not a confident Jev evaluation |
 | `jev_status` | `evaluated` \| `unavailable` \| `schema_rejected` |
 | `jev_proposed` | Jev choice, or empty when Jev did not evaluate |
+| `heuristic_failure_type` | Primary local heuristic type, exposed beside `jev_proposed` |
+| `suggested_action` | Signal-only enum: `triage`, `ignore-for-gate`, or `investigate-env` |
 | `needs_review` | `true` when request-review policy applied |
 | `tests_count` | Tests considered after filtering |
 | `failing_count` | Currently failing tests |
@@ -306,6 +312,8 @@ permissions:
 
 ## Decision model
 
+`heuristic_failure_type` is the local signal classification and `jev_proposed` is Jev's typed proposal. They are exposed side by side for debugging and trust calibration. `suggested_action` is only an allowlisted routing signal (`triage`, `ignore-for-gate`, or `investigate-env`); it never changes the test gate.
+
 | Field | Values |
 | --- | --- |
 | `decision` | `CLASSIFY` · `ABSTAIN` · `REQUEST_REVIEW` |
@@ -340,13 +348,15 @@ Sent (bounded, redacted):
 
 * Environment / runner labels
 * Aggregate pass-rate and flip stats
-* Sample of test ids, statuses, error digests, marker codes, heuristic hints
+* Sample of test ids, statuses, stable error fingerprints, marker codes, heuristic hints, and signal-only suggested actions
 
 Not sent:
 
 * Provider API keys
 * Full unbounded stack traces
 * Arbitrary workflow scripts as executable instructions
+
+Canonical normalized result contract: [`docs/test-result.schema.json`](docs/test-result.schema.json) and [`docs/test-result.example.json`](docs/test-result.example.json).
 
 Gateway requests use zero data retention. Custom endpoints must be public HTTPS.
 

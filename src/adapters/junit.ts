@@ -17,14 +17,21 @@ function decodeXml(value: string): string {
 
 export function parseJunitXml(xml: string, source = 'junit'): TestResult[] {
   const results: TestResult[] = [];
-  // Self-closing and paired forms must be separate alternatives so "/" is not
-  // swallowed into attributes before a body match spanning the next case.
-  const caseRegex =
-    /<testcase\b([^>]*?)\/>|<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/gi;
+  const suiteStack: string[] = [];
+  const tokenRegex = /<\/testsuite\s*>|<testsuite\b([^>]*?)(\/?)>|<testcase\b([^>]*?)\/>|<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/gi;
   let match: RegExpExecArray | null;
-  while ((match = caseRegex.exec(xml)) !== null) {
-    const openAttrs = (match[1] ?? match[2] ?? '').trim();
-    const body = match[3] ?? '';
+  while ((match = tokenRegex.exec(xml)) !== null) {
+    if (match[0].startsWith('</testsuite')) {
+      suiteStack.pop();
+      continue;
+    }
+    if (match[1] !== undefined) {
+      const suiteName = attr(match[1], 'name');
+      if (match[2] !== '/') suiteStack.push(suiteName ?? 'unnamed-suite');
+      continue;
+    }
+    const openAttrs = (match[3] ?? match[4] ?? '').trim();
+    const body = match[5] ?? '';
     const name = attr(openAttrs, 'name') ?? 'unnamed';
     const classname = attr(openAttrs, 'classname');
     const file = attr(openAttrs, 'file');
@@ -48,12 +55,7 @@ export function parseJunitXml(xml: string, source = 'junit'): TestResult[] {
       }
     }
 
-    let suite = classname;
-    if (!suite) {
-      const before = xml.slice(0, match.index);
-      const suites = [...before.matchAll(/<testsuite\b[^>]*\bname\s*=\s*"([^"]*)"/gi)];
-      suite = suites.at(-1)?.[1];
-    }
+    const suite = classname ?? (suiteStack.length > 0 ? suiteStack.join(' â€º ') : undefined);
 
     results.push(
       toTestResult({
