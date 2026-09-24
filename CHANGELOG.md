@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.2.0]
+
+### Added
+
+* Nested `append-history` Action and CLI to persist per-test runs into `.jev/test-history.json` (newest first, bounded `max_runs`).
+* Docs and example: append then classify.
+
+## [0.1.1] — 2026-09-24
+
 ### Changed
 
 * Professional README with full inputs/outputs tables, authentication, permissions, and output-condition examples.

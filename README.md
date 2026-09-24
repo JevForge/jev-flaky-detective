@@ -28,6 +28,7 @@ Pin `@v0`, an exact tag such as `@v0.1.0`, or a commit SHA.
 * Deterministic signals first (pass rate, flips, environment markers, path overlap)
 * Framework adapters: JUnit XML, Jest, Playwright, Vitest, Mocha
 * Optional native GitHub Actions history as supporting evidence
+* History append helper (`append-history`) to build per-test `.jev/test-history.json`
 * Strict schema validation; invalid Jev answers are rejected
 * Configurable low-confidence policy: `fail` · `warn` · `request-review` · `no-op`
 * Structured outputs for later steps (`decision`, `failure_type`, counts, …)
@@ -178,7 +179,9 @@ jobs:
         run: echo "Primary signal looks environmental — check runners/services"
 ```
 
-More workflows: [`examples/basic.yml`](examples/basic.yml), [`examples/with-junit.yml`](examples/with-junit.yml), [`examples/with-github-history.yml`](examples/with-github-history.yml), [`examples/pr-classify.yml`](examples/pr-classify.yml).
+More workflows: [`examples/basic.yml`](examples/basic.yml), [`examples/with-junit.yml`](examples/with-junit.yml), [`examples/with-github-history.yml`](examples/with-github-history.yml), [`examples/pr-classify.yml`](examples/pr-classify.yml), [`examples/append-then-classify.yml`](examples/append-then-classify.yml).
+
+Persist results between runs with the nested Action — see [docs/history-append.md](docs/history-append.md).
 
 ## Inputs
 
