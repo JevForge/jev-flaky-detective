@@ -27,8 +27,13 @@ npm run all
 1. Keep the public decision schema backward compatible. Add reason codes; do not rename existing ones.
 2. Keep Jev access behind `JevProvider`. Never execute explanation text.
 3. New adapters must normalize into `TestResult` and must not auto-rerun or hide failures.
-4. Rebuild and commit `dist/index.js` when the Action entrypoint changes.
+4. Rebuild and commit `dist/index.js` when the Action entrypoint changes (consumers do not run `npm install`).
 5. Prefer small PRs with tests for schema, policy, and adapter changes.
+6. Update the README / examples when inputs or outputs change.
+
+## Issues
+
+Use the bug / feature templates. **Do not include API keys, tokens, credentials, or other secrets.**
 
 ## Pull requests
 

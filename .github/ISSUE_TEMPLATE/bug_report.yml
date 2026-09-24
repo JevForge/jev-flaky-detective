@@ -2,21 +2,50 @@ name: Bug report
 description: Report a bug in JEV Flaky Detective
 labels: [bug]
 body:
-  - type: textarea
-    id: what
+  - type: markdown
     attributes:
-      label: What happened?
-      description: Do not paste secrets, tokens, or full proprietary test logs.
+      value: |
+        Thanks for the report.
+
+        **Do not include API keys, tokens, credentials, or other secrets.**
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
     validations:
       required: true
   - type: textarea
-    id: expect
+    id: expected
     attributes:
       label: Expected behavior
     validations:
       required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow snippet
+      description: Redacted YAML that reproduces the issue. Remove secrets.
+      render: yaml
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact tokens and credentials before pasting.
+    validations:
+      required: false
   - type: input
     id: version
     attributes:
       label: Action ref / version
-      placeholder: JevForge/jev-flaky-detective@v0
+      placeholder: JevForge/jev-flaky-detective@v0.1.0
+    validations:
+      required: true

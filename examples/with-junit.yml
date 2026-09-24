@@ -10,18 +10,30 @@ permissions:
   actions: read
 
 jobs:
-  test:
+  test-and-classify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run tests (example)
-        run: echo "produce reports/junit.xml in your real workflow"
-      - name: Classify with JUnit adapter
+
+      - name: Run tests (produce JUnit)
+        id: tests
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          # Replace with your real test command that writes reports/junit.xml
+          echo '<?xml version="1.0"?><testsuite name="demo"><testcase classname="Demo" name="example" time="0.01"><failure message="demo failure">stack</failure></testcase></testsuite>' > reports/junit.xml
+
+      - id: flaky
+        if: always()
         uses: JevForge/jev-flaky-detective@v0
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
         with:
           junit_path: reports/**/*.xml
           history_path: .jev/test-history.json
-          changed_paths: ${{ toJSON(github.event.pull_request) && '[]' || '[]' }}
           create_check_run: 'true'
-        env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          low_confidence_policy: warn
+
+      - name: Use failure_type
+        if: always()
+        run: echo "Primary classification is ${{ steps.flaky.outputs.failure_type }}"

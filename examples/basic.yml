@@ -16,8 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Classify failures
+
+      - id: flaky
+        name: Classify failures
         uses: JevForge/jev-flaky-detective@v0
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
         with:
           results_path: .jev/current-results.json
           history_path: .jev/test-history.json
@@ -25,5 +29,11 @@ jobs:
           create_check_run: 'true'
           comment_on_github: 'true'
           low_confidence_policy: warn
-        env:
-          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+
+      - name: Show classification
+        if: always()
+        run: |
+          echo "decision=${{ steps.flaky.outputs.decision }}"
+          echo "failure_type=${{ steps.flaky.outputs.failure_type }}"
+          echo "confidence=${{ steps.flaky.outputs.confidence }}"
+          echo "provisional=${{ steps.flaky.outputs.provisional }}"

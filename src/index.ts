@@ -14,6 +14,12 @@ import type { LowConfidencePolicy, SourceErrorPolicy } from './schemas/enums.js'
 import { LOW_CONFIDENCE_POLICIES, SOURCE_ERROR_POLICIES, ENVIRONMENTS } from './schemas/enums.js';
 import { assertModelId } from './utils/endpoint.js';
 
+const LOG_PREFIX = '[JEV Flaky Detective]';
+
+function failMessage(message: string): string {
+  return message.startsWith(LOG_PREFIX) ? message : `${LOG_PREFIX} ${message}`;
+}
+
 function boolInput(name: string, fallback = false): boolean {
   const raw = core.getInput(name);
   if (!raw) return fallback;
@@ -24,13 +30,15 @@ function numInput(name: string, fallback: number): number {
   const raw = core.getInput(name);
   if (!raw) return fallback;
   const value = Number(raw);
-  if (!Number.isFinite(value)) throw new Error(`${name} must be a number`);
+  if (!Number.isFinite(value)) throw new Error(failMessage(`${name} must be a number`));
   return value;
 }
 
 function enumInput<T extends string>(name: string, allowed: readonly T[], fallback: T): T {
   const raw = (core.getInput(name) || fallback).trim() as T;
-  if (!allowed.includes(raw)) throw new Error(`${name} must be one of ${allowed.join(', ')}`);
+  if (!allowed.includes(raw)) {
+    throw new Error(failMessage(`${name} must be one of ${allowed.join(', ')}`));
+  }
   return raw;
 }
 
@@ -44,7 +52,9 @@ async function main(): Promise<void> {
   const endpoint =
     endpointFromInput || (trustRepoEndpoint ? config.jev_endpoint : undefined);
   const model = core.getInput('jev_model') || config.jev_model || undefined;
-  if (model && !assertModelId(model)) throw new Error('jev_model has an invalid format');
+  if (model && !assertModelId(model)) {
+    throw new Error(failMessage('jev_model has an invalid format'));
+  }
 
   const loaded = loadEvidence({
     workspace,
@@ -231,13 +241,13 @@ async function main(): Promise<void> {
     .write();
 
   if (result.actionStatus === 'fail') {
-    core.setFailed(result.outcome.decision.summary);
+    core.setFailed(failMessage(result.outcome.decision.summary));
   } else if (result.actionStatus === 'warn') {
-    core.warning(result.outcome.decision.summary);
+    core.warning(failMessage(result.outcome.decision.summary));
   }
 }
 
 void main().catch(error => {
   const message = error instanceof Error ? error.message : String(error);
-  core.setFailed(message);
+  core.setFailed(failMessage(message));
 });

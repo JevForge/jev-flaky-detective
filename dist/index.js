@@ -52382,12 +52382,18 @@ async function runDetective(params) {
 function parseProviderId(raw, fallback = "vercel-ai-gateway") {
   const value = (raw || fallback).trim();
   if (!JEV_PROVIDERS.includes(value)) {
-    throw new Error(`Unsupported jev_provider: ${value}`);
+    throw new Error(
+      `[JEV Flaky Detective] Unsupported jev_provider: ${value}. Use vercel-ai-gateway, typesafe-native, or custom-compatible.`
+    );
   }
   return value;
 }
 
 // src/index.ts
+var LOG_PREFIX = "[JEV Flaky Detective]";
+function failMessage(message) {
+  return message.startsWith(LOG_PREFIX) ? message : `${LOG_PREFIX} ${message}`;
+}
 function boolInput(name25, fallback = false) {
   const raw = core.getInput(name25);
   if (!raw) return fallback;
@@ -52397,12 +52403,14 @@ function numInput(name25, fallback) {
   const raw = core.getInput(name25);
   if (!raw) return fallback;
   const value = Number(raw);
-  if (!Number.isFinite(value)) throw new Error(`${name25} must be a number`);
+  if (!Number.isFinite(value)) throw new Error(failMessage(`${name25} must be a number`));
   return value;
 }
 function enumInput(name25, allowed, fallback) {
   const raw = (core.getInput(name25) || fallback).trim();
-  if (!allowed.includes(raw)) throw new Error(`${name25} must be one of ${allowed.join(", ")}`);
+  if (!allowed.includes(raw)) {
+    throw new Error(failMessage(`${name25} must be one of ${allowed.join(", ")}`));
+  }
   return raw;
 }
 async function main() {
@@ -52413,7 +52421,9 @@ async function main() {
   const endpointFromInput = core.getInput("jev_endpoint") || void 0;
   const endpoint = endpointFromInput || (trustRepoEndpoint ? config2.jev_endpoint : void 0);
   const model = core.getInput("jev_model") || config2.jev_model || void 0;
-  if (model && !assertModelId(model)) throw new Error("jev_model has an invalid format");
+  if (model && !assertModelId(model)) {
+    throw new Error(failMessage("jev_model has an invalid format"));
+  }
   const loaded = loadEvidence({
     workspace,
     resultsInline: core.getInput("results") || void 0,
@@ -52571,12 +52581,12 @@ async function main() {
   }
   await core.summary.addHeading("JEV Flaky Detective").addRaw(result.outcome.decision.summary).write();
   if (result.actionStatus === "fail") {
-    core.setFailed(result.outcome.decision.summary);
+    core.setFailed(failMessage(result.outcome.decision.summary));
   } else if (result.actionStatus === "warn") {
-    core.warning(result.outcome.decision.summary);
+    core.warning(failMessage(result.outcome.decision.summary));
   }
 }
 void main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
-  core.setFailed(message);
+  core.setFailed(failMessage(message));
 });

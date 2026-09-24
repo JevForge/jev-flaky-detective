@@ -21,8 +21,10 @@ Length: 122 characters.
 ## Publish checklist
 
 1. Public repository with root `action.yml` — done.
-2. GitHub Release with a semver tag (`v0.1.0` or later) — use the Release workflow (`jev-release-forge`).
+2. GitHub Release with a semver tag (`v0.1.0` or later) — done via Release workflow.
 3. Accept the GitHub Marketplace Developer Agreement for the JevForge org (one-time).
 4. Edit the latest release → check **Publish this Action to the GitHub Marketplace** → choose categories → update release (requires 2FA; cannot run in CI).
 
-Trigger a release from Actions → Release → Run workflow with version `X.Y.Z`.
+Categories: **Continuous integration** + **Code quality**.
+
+Trigger later releases from Actions → Release → Run workflow with version `X.Y.Z`.

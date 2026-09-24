@@ -1,0 +1,53 @@
+name: PR classify failures
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        id: unit
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          # Replace with: npm test -- --reporter=junit --outputFile=reports/junit.xml
+          echo '<?xml version="1.0"?><testsuite name="unit"><testcase classname="Auth" name="login" time="0.12"><failure message="AssertionError">expected 200</failure></testcase></testsuite>' > reports/junit.xml
+
+      - id: flaky
+        if: always()
+        uses: JevForge/jev-flaky-detective@v0
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        with:
+          junit_path: reports/**/*.xml
+          history_path: .jev/test-history.json
+          comment_on_github: 'true'
+          create_check_run: 'true'
+          low_confidence_policy: warn
+          write_report_artifact: 'true'
+
+      - name: Flake triage
+        if: always() && steps.flaky.outputs.failure_type == 'flaky'
+        run: echo "Looks flaky — notify flake owners"
+
+      - name: Regression triage
+        if: always() && steps.flaky.outputs.failure_type == 'regression'
+        run: echo "Looks like a regression — notify PR authors"
+
+      - name: Environment triage
+        if: always() && steps.flaky.outputs.failure_type == 'environment'
+        run: echo "Looks environmental — check runners and dependencies"
+
+      - name: Review required
+        if: always() && steps.flaky.outputs.needs_review == 'true'
+        run: echo "Classification is provisional — human review needed"

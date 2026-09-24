@@ -166,7 +166,9 @@ export async function runDetective(params: RunDetectiveParams): Promise<RunDetec
 export function parseProviderId(raw: string | undefined, fallback: JevProviderId = 'vercel-ai-gateway'): JevProviderId {
   const value = (raw || fallback).trim();
   if (!(JEV_PROVIDERS as readonly string[]).includes(value)) {
-    throw new Error(`Unsupported jev_provider: ${value}`);
+    throw new Error(
+      `[JEV Flaky Detective] Unsupported jev_provider: ${value}. Use vercel-ai-gateway, typesafe-native, or custom-compatible.`,
+    );
   }
   return value as JevProviderId;
 }

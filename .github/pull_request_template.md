@@ -2,9 +2,11 @@
 
 <!-- What changed and why -->
 
-## Test plan
+## Checklist
 
-- [ ] `npm run typecheck`
-- [ ] `npm test`
-- [ ] `npm run build` and commit `dist/` if entrypoint changed
-- [ ] Decision schema / reason codes stay backward compatible
+- [ ] Code tested locally (`npm test` / `npm run typecheck`)
+- [ ] Documentation updated when inputs/outputs/behavior changed
+- [ ] No secrets, tokens, or credentials in the diff
+- [ ] Public decision schema remains backward compatible
+- [ ] `dist/` rebuilt and committed if the Action entrypoint changed
+- [ ] Behavior stays compatible with the documented contract

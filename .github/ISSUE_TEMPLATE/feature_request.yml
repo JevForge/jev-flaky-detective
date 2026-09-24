@@ -1,16 +1,30 @@
 name: Feature request
-description: Suggest an improvement
+description: Suggest an improvement for JEV Flaky Detective
 labels: [enhancement]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and proposal.
+
+        **Do not include API keys, tokens, credentials, or other secrets.**
   - type: textarea
     id: problem
     attributes:
       label: Problem
+      description: What workflow pain does this address?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
       label: Proposal
+      description: How should the Action behave?
     validations:
       required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
