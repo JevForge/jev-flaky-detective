@@ -27,6 +27,7 @@ jobs:
           workflow_name: CI
           create_check_run: 'true'
           comment_on_github: 'false'
+          dry_run: 'true'
 
       - name: Show evidence summary
         if: always()

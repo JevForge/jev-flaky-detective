@@ -8,3 +8,15 @@ lib/
 .DS_Store
 *.tsbuildinfo
 .jev/reports/
+
+# Local test inputs and generated evidence
+.jev/current-results.json
+.jev/flaky-classifications.json
+.jev/test-history.json
+
+# Agent and local review artifacts
+.grill/
+.security-check/
+.start-feature/
+.test-feature/
+jev-flaky-detective-threat-model.md

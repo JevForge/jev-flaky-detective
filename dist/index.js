@@ -31960,16 +31960,27 @@ var github = __toESM(require_github(), 1);
 var import_node_fs2 = require("node:fs");
 
 // src/utils/sanitize.ts
+var import_node_crypto = require("node:crypto");
 var SECRET_PATTERNS = [
   /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,}\b/g,
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   /\bsk-[A-Za-z0-9_-]{20,}\b/g,
   /\b(AI_GATEWAY_API_KEY|TYPESAFE_API_KEY|JEV_CUSTOM_API_KEY)\s*[:=]\s*\S+/gi,
-  /\b(api[_-]?key|token|authorization|bearer)\b\s*[:=]\s*\S+/gi,
+  /\b(api[_-]?key|token|secret|password|passwd|authorization|bearer)\b\s*[:=]\s*[^\s,;&]+/gi,
   /\bBearer\s+[A-Za-z0-9._\-+=/]{12,}/gi
 ];
 function redactSecrets(text2) {
   let out = text2;
+  out = out.replace(/\b(authorization)\s*[:=]\s*bearer\s+[^\s,;&]+/gi, "$1: [REDACTED]");
+  out = out.replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, "$1[REDACTED]@");
+  out = out.replace(
+    /([?&](?:access[_-]?token|api[_-]?key|auth|key|password|passwd|secret|signature|sig|token)=)[^&#\s]+/gi,
+    "$1[REDACTED]"
+  );
+  out = out.replace(
+    /((?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis):\/\/[^\s:/]+:)[^\s/@]+(@)/gi,
+    "$1[REDACTED]$2"
+  );
   for (const pattern of SECRET_PATTERNS) {
     out = out.replace(pattern, "[REDACTED]");
   }
@@ -31984,14 +31995,38 @@ function sanitizeError(text2, maxChars = 800) {
   if (!text2) return void 0;
   return sanitizeSummary(text2, maxChars);
 }
-function digestError(text2) {
-  if (!text2) return void 0;
-  const cleaned = sanitizeSummary(text2, 400).replace(/\d+/g, "N").replace(/0x[0-9a-fA-F]+/g, "0xH").replace(/[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}/g, "UUID").toLowerCase();
-  let hash = 0;
-  for (let i = 0; i < cleaned.length; i += 1) {
-    hash = hash * 31 + cleaned.charCodeAt(i) >>> 0;
-  }
-  return `${hash.toString(16)}:${cleaned.slice(0, 80)}`;
+function normalizeVolatile(value) {
+  return redactSecrets(value).replace(/\r\n?/g, "\n").replace(/[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12}/g, "UUID").replace(/0x[0-9a-fA-F]+/g, "0xH").replace(/\b\d+(?:\.\d+)?\b/g, "N").replace(/\s+/g, " ").trim().toLowerCase();
+}
+function normalizeStack(stack) {
+  if (!stack) return "";
+  return stack.split("\n").slice(0, 8).map((line) => {
+    const stableLine = line.replace(/(?:[A-Za-z]:)?[/\\](?:workspace|runner|home|tmp|Users)[/\\]/gi, "/");
+    const pathMatch = stableLine.match(/(?:file:\/\/)?((?:[A-Za-z]:)?(?:[/\\][^()\s]+)+)/);
+    if (!pathMatch) return normalizeVolatile(line);
+    const segments = pathMatch[1].split(/[/\\]+/).filter(Boolean);
+    const anchor = segments.findIndex((segment) => /^(src|test|tests|lib|packages)$/i.test(segment));
+    const stablePath = segments.slice(anchor >= 0 ? anchor : Math.max(0, segments.length - 2)).join("/");
+    return normalizeVolatile(stableLine.replace(pathMatch[1], stablePath));
+  }).join("|");
+}
+function fingerprintError(input) {
+  if (!input) return void 0;
+  const value = typeof input === "string" ? { message: input, stack: input } : input;
+  const canonical = [
+    normalizeVolatile(value.errorType ?? ""),
+    normalizeVolatile(value.message ?? ""),
+    normalizeStack(value.stack)
+  ].join("|");
+  if (!canonical.replace(/\|/g, "")) return void 0;
+  return `sha256:${(0, import_node_crypto.createHash)("sha256").update(canonical).digest("hex")}`;
+}
+function fingerprintTestResult(result) {
+  return fingerprintError({
+    errorType: result.error_type,
+    message: result.error_message,
+    stack: result.stack_snippet
+  });
 }
 
 // src/adapters/common.ts
@@ -32039,11 +32074,21 @@ function decodeXml(value) {
 }
 function parseJunitXml(xml, source = "junit") {
   const results = [];
-  const caseRegex = /<testcase\b([^>]*?)\/>|<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/gi;
+  const suiteStack = [];
+  const tokenRegex = /<\/testsuite\s*>|<testsuite\b([^>]*?)(\/?)>|<testcase\b([^>]*?)\/>|<testcase\b([^>]*)>([\s\S]*?)<\/testcase>/gi;
   let match;
-  while ((match = caseRegex.exec(xml)) !== null) {
-    const openAttrs = (match[1] ?? match[2] ?? "").trim();
-    const body = match[3] ?? "";
+  while ((match = tokenRegex.exec(xml)) !== null) {
+    if (match[0].startsWith("</testsuite")) {
+      suiteStack.pop();
+      continue;
+    }
+    if (match[1] !== void 0) {
+      const suiteName = attr(match[1], "name");
+      if (match[2] !== "/") suiteStack.push(suiteName ?? "unnamed-suite");
+      continue;
+    }
+    const openAttrs = (match[3] ?? match[4] ?? "").trim();
+    const body = match[5] ?? "";
     const name25 = attr(openAttrs, "name") ?? "unnamed";
     const classname = attr(openAttrs, "classname");
     const file = attr(openAttrs, "file");
@@ -32065,12 +32110,7 @@ function parseJunitXml(xml, source = "junit") {
         errorMessage = decodeXml((attr(tag, "message") ?? hit[3] ?? "").trim());
       }
     }
-    let suite = classname;
-    if (!suite) {
-      const before = xml.slice(0, match.index);
-      const suites = [...before.matchAll(/<testsuite\b[^>]*\bname\s*=\s*"([^"]*)"/gi)];
-      suite = suites.at(-1)?.[1];
-    }
+    const suite = classname ?? (suiteStack.length > 0 ? suiteStack.join(" \xE2\u20AC\xBA ") : void 0);
     results.push(
       toTestResult({
         name: name25,
@@ -32092,6 +32132,13 @@ function parseJunitXml(xml, source = "junit") {
 function parseJestJson(raw, source = "jest") {
   const report = typeof raw === "string" ? JSON.parse(raw) : raw;
   const results = [];
+  const reportTags = [
+    report.numPendingTests ? `jest:pending-tests:${report.numPendingTests}` : void 0,
+    report.snapshot?.unmatched ? `jest:snapshot-unmatched:${report.snapshot.unmatched}` : void 0,
+    report.snapshot?.added ? `jest:snapshot-added:${report.snapshot.added}` : void 0,
+    report.snapshot?.updated ? `jest:snapshot-updated:${report.snapshot.updated}` : void 0,
+    report.snapshot?.filesRemoved ? `jest:snapshot-files-removed:${report.snapshot.filesRemoved}` : void 0
+  ].filter((tag) => Boolean(tag));
   for (const file of report.testResults ?? []) {
     for (const assertion of file.assertionResults ?? []) {
       const suite = assertion.ancestorTitles?.join(" \u203A ");
@@ -32104,6 +32151,7 @@ function parseJestJson(raw, source = "jest") {
           status: assertion.status ?? "unknown",
           duration_ms: assertion.duration,
           error_message: assertion.failureMessages?.[0],
+          tags: [...reportTags, ...Object.keys(assertion.meta ?? {}).slice(0, 8).map((key) => `jest:meta:${key}`)],
           source
         })
       );
@@ -32120,6 +32168,11 @@ function walkSuite(suite, results, parent) {
     for (const test of spec.tests ?? []) {
       const last = test.results?.[test.results.length - 1];
       const status = last?.status ?? "unknown";
+      const retries = Math.max(0, ...(test.results ?? []).map((result) => result.retry ?? 0));
+      const tags = [
+        test.outcome === "flaky" ? "playwright:flaky" : void 0,
+        retries > 0 ? `playwright:retries:${retries}` : void 0
+      ].filter((tag) => Boolean(tag));
       results.push(
         toTestResult({
           name: test.title ?? spec.title ?? "unnamed",
@@ -32129,7 +32182,9 @@ function walkSuite(suite, results, parent) {
           duration_ms: last?.duration,
           error_message: last?.error?.message,
           stack_snippet: last?.error?.stack,
-          retries: last?.retry,
+          retries,
+          attempt: typeof last?.retry === "number" ? last.retry + 1 : void 0,
+          tags,
           source: "playwright"
         })
       );
@@ -32162,6 +32217,7 @@ function parseVitestJson(raw, source = "vitest") {
             status: assertion.status ?? "unknown",
             duration_ms: assertion.duration,
             error_message: assertion.failureMessages?.[0],
+            tags: Object.keys(assertion.meta ?? {}).slice(0, 8).map((key) => `vitest:meta:${key}`),
             source
           })
         );
@@ -36333,6 +36389,7 @@ var SOURCE_ERROR_POLICIES = ["fail", "warn"];
 var ENVIRONMENTS = ["production", "staging", "development", "test", "ci", "unknown"];
 var JEV_STATUSES = ["evaluated", "unavailable", "schema_rejected"];
 var DECISION_MODES = ["jev", "deterministic"];
+var SUGGESTED_ACTIONS = ["triage", "ignore-for-gate", "investigate-env"];
 var REASON_CODES = [
   "CURRENT_FAILURE",
   "CURRENT_PASS",
@@ -36346,6 +36403,8 @@ var REASON_CODES = [
   "FIRST_FAILURE",
   "STABLE_ERROR_SIGNATURE",
   "CHANGING_ERROR_SIGNATURE",
+  "SAME_ERROR_FINGERPRINT",
+  "CHANGED_ERROR_FINGERPRINT",
   "ENVIRONMENT_MARKERS",
   "TIMEOUT_MARKERS",
   "RESOURCE_MARKERS",
@@ -36429,7 +36488,10 @@ var ClassificationSchema = external_exports.object({
   confidence: external_exports.number().min(0).max(1),
   reason_codes: external_exports.array(external_exports.enum(REASON_CODES)).max(24),
   evidence: TestSignalsSchema.partial().optional(),
-  error_digest: external_exports.string().max(256).optional()
+  error_digest: external_exports.string().max(256).optional(),
+  heuristic_failure_type: external_exports.enum(FAILURE_TYPES),
+  heuristic_confidence: external_exports.number().min(0).max(1),
+  suggested_action: external_exports.enum(SUGGESTED_ACTIONS)
 });
 var DetectiveDecisionSchema = external_exports.object({
   decision: external_exports.enum(DECISIONS),
@@ -36441,7 +36503,9 @@ var DetectiveDecisionSchema = external_exports.object({
   provisional: external_exports.boolean(),
   provider: external_exports.enum(JEV_PROVIDERS).optional(),
   jev_status: external_exports.enum(JEV_STATUSES),
-  jev_proposed: external_exports.enum(FAILURE_TYPES).nullable()
+  jev_proposed: external_exports.enum(FAILURE_TYPES).nullable(),
+  heuristic_failure_type: external_exports.enum(FAILURE_TYPES),
+  suggested_action: external_exports.enum(SUGGESTED_ACTIONS)
 });
 var SourceErrorSchema = external_exports.object({
   source: external_exports.string(),
@@ -36458,6 +36522,7 @@ var RunOptionsSchema = external_exports.object({
   source_error_policy: external_exports.enum(SOURCE_ERROR_POLICIES).default("warn"),
   max_tests: external_exports.number().int().positive().max(5e3).default(500),
   max_tests_to_jev: external_exports.number().int().positive().max(100).default(25),
+  max_report_size_mb: external_exports.number().positive().max(100).default(10),
   history_lookback: external_exports.number().int().positive().max(50).default(20),
   comment_on_github: external_exports.boolean().default(false),
   create_check_run: external_exports.boolean().default(true),
@@ -36475,7 +36540,8 @@ var EvidenceSummarySchema = external_exports.object({
   avg_flip_count: external_exports.number().nonnegative().nullable(),
   environment_marker_tests: external_exports.number().int().nonnegative(),
   changed_path_overlap_tests: external_exports.number().int().nonnegative(),
-  adapter_sources: external_exports.array(external_exports.string()).max(16)
+  adapter_sources: external_exports.array(external_exports.string()).max(16),
+  duration_ms: external_exports.number().nonnegative()
 });
 
 // src/collectors/normalize.ts
@@ -36558,17 +36624,28 @@ function parseChangedPaths(raw) {
   }
   return raw.split(/[\n,]+/).map((part) => toPosix(part.trim())).filter(Boolean).slice(0, 2e3);
 }
-function readJsonFile(workspace, relative) {
+function readBoundedText(file, maxReportBytes) {
+  const size = (0, import_node_fs2.statSync)(file).size;
+  if (size > maxReportBytes) {
+    throw new Error(`report exceeds the maximum report size of ${maxReportBytes} bytes`);
+  }
+  return (0, import_node_fs2.readFileSync)(file, "utf8");
+}
+function readJsonFile(workspace, relative, maxReportBytes) {
   const full = assertInsideWorkspace(workspace, relative);
-  return JSON.parse((0, import_node_fs2.readFileSync)(full, "utf8"));
+  return JSON.parse(readBoundedText(full, maxReportBytes));
 }
 function loadEvidence(input) {
+  const maxReportBytes = input.maxReportBytes ?? 10 * 1024 * 1024;
   const sourceErrors = [];
   const adapterSources = [];
   const reasonCodes = [];
   const groups = [];
   if (input.resultsInline?.trim()) {
     try {
+      if (Buffer.byteLength(input.resultsInline, "utf8") > maxReportBytes) {
+        throw new Error(`report exceeds the maximum report size of ${maxReportBytes} bytes`);
+      }
       groups.push(parseResultsPayload(input.resultsInline));
     } catch (error) {
       sourceErrors.push({
@@ -36585,7 +36662,7 @@ function loadEvidence(input) {
         continue;
       }
       for (const file of files) {
-        groups.push(parseResultsPayload(JSON.parse((0, import_node_fs2.readFileSync)(file, "utf8"))));
+        groups.push(parseResultsPayload(JSON.parse(readBoundedText(file, maxReportBytes))));
       }
     } catch (error) {
       sourceErrors.push({
@@ -36616,7 +36693,7 @@ function loadEvidence(input) {
     }
     for (const file of files) {
       try {
-        groups.push(adapter.parse((0, import_node_fs2.readFileSync)(file, "utf8")));
+        groups.push(adapter.parse(readBoundedText(file, maxReportBytes)));
         if (!adapterSources.includes(adapter.label)) adapterSources.push(adapter.label);
         if (!reasonCodes.includes(adapter.code)) reasonCodes.push(adapter.code);
       } catch (error) {
@@ -36643,7 +36720,7 @@ function loadEvidence(input) {
     try {
       const full = assertInsideWorkspace(input.workspace, input.historyPath);
       if ((0, import_node_fs2.existsSync)(full)) {
-        history = parseHistoryPayload(readJsonFile(input.workspace, input.historyPath));
+        history = parseHistoryPayload(readJsonFile(input.workspace, input.historyPath, maxReportBytes));
         reasonCodes.push(history.length > 0 ? "HISTORY_AVAILABLE" : "HISTORY_EMPTY");
       } else {
         reasonCodes.push("HISTORY_EMPTY");
@@ -51815,6 +51892,8 @@ function emitOutputs(input) {
     provisional: String(decision.provisional),
     jev_status: decision.jev_status,
     jev_proposed: decision.jev_proposed ?? "",
+    heuristic_failure_type: decision.heuristic_failure_type,
+    suggested_action: decision.suggested_action,
     needs_review: String(input.needsReview),
     tests_count: String(input.evidence.tests_considered),
     failing_count: String(input.evidence.failing_count),
@@ -51924,7 +52003,7 @@ function computeSignals(current, history, lookback, changedPaths) {
     } else {
       countingConsecutive = false;
     }
-    const digest = digestError(result.error_message ?? result.stack_snippet);
+    const digest = fingerprintTestResult(result);
     if (digest) digests.push(digest);
     if (typeof result.duration_ms === "number") durations.push(result.duration_ms);
     void fromHistory;
@@ -52026,7 +52105,9 @@ function buildEvaluationState(input) {
         changed_path_overlap: signals.changed_path_overlap,
         duration_spike: signals.duration_spike
       } : {},
-      error_digest: digestError(test.error_message ?? test.stack_snippet),
+      error_digest: fingerprintTestResult(test),
+      heuristic_failure_type: heuristic?.failure_type ?? "unknown",
+      suggested_action: heuristic?.failure_type === "environment" ? "investigate-env" : heuristic?.failure_type === "flaky" && (heuristic?.confidence ?? 0) >= 0.7 ? "ignore-for-gate" : "triage",
       error_preview: sanitizeError(test.error_message, 240)
     };
   });
@@ -52066,6 +52147,11 @@ function classifyReason(type) {
       return "CLASSIFIED_UNKNOWN";
   }
 }
+function suggestedActionFor(type, confidence) {
+  if (type === "environment") return "investigate-env";
+  if (type === "flaky" && confidence >= 0.7) return "ignore-for-gate";
+  return "triage";
+}
 function signalsToReasons(signals, codes) {
   if (signals.current_status === "failed" || signals.current_status === "timedOut") {
     pushCode(codes, "CURRENT_FAILURE");
@@ -52078,9 +52164,13 @@ function signalsToReasons(signals, codes) {
   if (signals.pass_rate > 0.8) pushCode(codes, "HIGH_PASS_RATE");
   if (signals.consecutive_failures >= 2) pushCode(codes, "CONSECUTIVE_FAILURES");
   if (signals.first_failure) pushCode(codes, "FIRST_FAILURE");
-  if ((signals.same_error_ratio ?? 0) >= 0.8) pushCode(codes, "STABLE_ERROR_SIGNATURE");
+  if ((signals.same_error_ratio ?? 0) >= 0.8) {
+    pushCode(codes, "STABLE_ERROR_SIGNATURE");
+    pushCode(codes, "SAME_ERROR_FINGERPRINT");
+  }
   if (signals.same_error_ratio !== null && signals.same_error_ratio < 0.5 && signals.fail_count >= 2) {
     pushCode(codes, "CHANGING_ERROR_SIGNATURE");
+    pushCode(codes, "CHANGED_ERROR_FINGERPRINT");
   }
   if (signals.environment_marker_hits.length) pushCode(codes, "ENVIRONMENT_MARKERS");
   if (signals.environment_marker_hits.includes("timeout")) pushCode(codes, "TIMEOUT_MARKERS");
@@ -52105,7 +52195,10 @@ function buildClassifications(input) {
       confidence: Math.min(input.confidence || heuristic.confidence, 1),
       reason_codes: codes,
       evidence: signals,
-      error_digest: digestError(test.error_message ?? test.stack_snippet)
+      error_digest: fingerprintTestResult(test),
+      heuristic_failure_type: heuristic.failure_type,
+      heuristic_confidence: heuristic.confidence,
+      suggested_action: suggestedActionFor(heuristic.failure_type, heuristic.confidence)
     };
   });
 }
@@ -52199,6 +52292,9 @@ function applyPolicy(input) {
   if (decision === "CLASSIFY") {
     primary = majorityType(classifications.filter((row) => row.failure_type !== "unknown")) || majorityType(classifications);
   }
+  const heuristicPrimary = majorityType(
+    classifications.map((row) => ({ ...row, failure_type: row.heuristic_failure_type }))
+  );
   const summary2 = sanitizeSummary(
     decision === "CLASSIFY" ? `Classified ${classifications.length} test(s); primary failure_type=${primary} (confidence=${confidence.toFixed(2)}).` : decision === "REQUEST_REVIEW" ? `Review required before trusting failure classification (primary=${primary}).` : `Abstained from classifying failures (primary=${primary}). Failures were not masked or re-run.`
   );
@@ -52212,7 +52308,9 @@ function applyPolicy(input) {
     provisional,
     provider: input.provider,
     jev_status: jevStatus,
-    jev_proposed: jevProposed
+    jev_proposed: jevProposed,
+    heuristic_failure_type: heuristicPrimary,
+    suggested_action: suggestedActionFor(primary, confidence)
   });
   return {
     decision: finalDecision,
@@ -52292,6 +52390,7 @@ function planEffects(input) {
 
 // src/run.ts
 async function runDetective(params) {
+  const startedAt = Date.now();
   const options = RunOptionsSchema.parse(params.options);
   let tests = [...params.current];
   if (options.test_id) {
@@ -52374,7 +52473,8 @@ async function runDetective(params) {
     avg_flip_count: state.aggregate.avg_flip_count,
     environment_marker_tests: state.aggregate.environment_marker_tests,
     changed_path_overlap_tests: signals.filter((signal) => signal.changed_path_overlap).length,
-    adapter_sources: params.adapterSources
+    adapter_sources: params.adapterSources,
+    duration_ms: Date.now() - startedAt
   });
   const effects = planEffects({
     decision: outcome.decision,
@@ -52470,7 +52570,8 @@ async function main() {
     playwrightPath: core.getInput("playwright_path") || void 0,
     vitestPath: core.getInput("vitest_path") || void 0,
     mochaPath: core.getInput("mocha_path") || void 0,
-    changedPathsRaw: core.getInput("changed_paths") || void 0
+    changedPathsRaw: core.getInput("changed_paths") || void 0,
+    maxReportBytes: numInput("max_report_size_mb", 10) * 1024 * 1024
   });
   const token = core.getInput("github_token") || process.env.GITHUB_TOKEN || "";
   const octokit = token ? github.getOctokit(token) : null;
@@ -52615,6 +52716,7 @@ async function main() {
       source_error_policy: enumInput("source_error_policy", SOURCE_ERROR_POLICIES, "warn"),
       max_tests: numInput("max_tests", 500),
       max_tests_to_jev: numInput("max_tests_to_jev", 25),
+      max_report_size_mb: numInput("max_report_size_mb", 10),
       history_lookback: numInput("history_lookback", 20),
       comment_on_github: boolInput("comment_on_github", false),
       create_check_run: boolInput("create_check_run", true),
@@ -52644,7 +52746,10 @@ async function main() {
         confidence: result.outcome.decision.confidence,
         provisional: result.outcome.decision.provisional,
         provider: providerId,
-        tests: result.evidence.tests_considered
+        tests: result.evidence.tests_considered,
+        duration_ms: result.evidence.duration_ms,
+        adapter_sources: result.evidence.adapter_sources,
+        history_runs: result.evidence.history_runs
       })
     );
   }

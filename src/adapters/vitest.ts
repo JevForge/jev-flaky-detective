@@ -8,6 +8,7 @@ interface VitestAssertion {
   duration?: number;
   failureMessages?: string[];
   ancestorTitles?: string[];
+  meta?: Record<string, unknown>;
 }
 
 interface VitestFile {
@@ -42,6 +43,7 @@ export function parseVitestJson(raw: unknown, source = 'vitest'): TestResult[] {
             status: assertion.status ?? 'unknown',
             duration_ms: assertion.duration,
             error_message: assertion.failureMessages?.[0],
+            tags: Object.keys(assertion.meta ?? {}).slice(0, 8).map(key => `vitest:meta:${key}`),
             source,
           }),
         );

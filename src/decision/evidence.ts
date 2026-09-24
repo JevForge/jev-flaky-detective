@@ -1,6 +1,6 @@
 import type { TestResult, TestSignals } from '../schemas/detective.js';
 import { UNTRUSTED_NOTE } from '../schemas/enums.js';
-import { digestError, sanitizeError } from '../utils/sanitize.js';
+import { fingerprintTestResult, sanitizeError } from '../utils/sanitize.js';
 
 export interface SampleRow {
   test_id: string;
@@ -10,6 +10,8 @@ export interface SampleRow {
   heuristic_confidence: number;
   signals: Partial<TestSignals>;
   error_digest?: string;
+  heuristic_failure_type: string;
+  suggested_action: 'triage' | 'ignore-for-gate' | 'investigate-env';
   error_preview?: string;
 }
 
@@ -69,7 +71,14 @@ export function buildEvaluationState(input: {
             duration_spike: signals.duration_spike,
           }
         : {},
-      error_digest: digestError(test.error_message ?? test.stack_snippet),
+      error_digest: fingerprintTestResult(test),
+      heuristic_failure_type: heuristic?.failure_type ?? 'unknown',
+      suggested_action:
+        heuristic?.failure_type === 'environment'
+          ? 'investigate-env'
+          : heuristic?.failure_type === 'flaky' && (heuristic?.confidence ?? 0) >= 0.7
+            ? 'ignore-for-gate'
+            : 'triage' as SampleRow['suggested_action'],
       error_preview: sanitizeError(test.error_message, 240),
     };
   });

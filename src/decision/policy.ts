@@ -11,9 +11,10 @@ import type {
   LowConfidencePolicy,
   ReasonCode,
   SourceErrorPolicy,
+  SuggestedAction,
 } from '../schemas/enums.js';
 import type { JevCallResult } from '../jev/contract.js';
-import { digestError, sanitizeSummary } from '../utils/sanitize.js';
+import { fingerprintTestResult, sanitizeSummary } from '../utils/sanitize.js';
 import { heuristicFailureType } from '../collectors/signals.js';
 
 export type ActionStatus = 'ok' | 'fail' | 'warn' | 'request-review' | 'no-op';
@@ -41,6 +42,12 @@ function classifyReason(type: FailureType): ReasonCode {
   }
 }
 
+export function suggestedActionFor(type: FailureType, confidence: number): SuggestedAction {
+  if (type === 'environment') return 'investigate-env';
+  if (type === 'flaky' && confidence >= 0.7) return 'ignore-for-gate';
+  return 'triage';
+}
+
 function signalsToReasons(signals: TestSignals, codes: ReasonCode[]): void {
   if (signals.current_status === 'failed' || signals.current_status === 'timedOut') {
     pushCode(codes, 'CURRENT_FAILURE');
@@ -53,9 +60,13 @@ function signalsToReasons(signals: TestSignals, codes: ReasonCode[]): void {
   if (signals.pass_rate > 0.8) pushCode(codes, 'HIGH_PASS_RATE');
   if (signals.consecutive_failures >= 2) pushCode(codes, 'CONSECUTIVE_FAILURES');
   if (signals.first_failure) pushCode(codes, 'FIRST_FAILURE');
-  if ((signals.same_error_ratio ?? 0) >= 0.8) pushCode(codes, 'STABLE_ERROR_SIGNATURE');
+  if ((signals.same_error_ratio ?? 0) >= 0.8) {
+    pushCode(codes, 'STABLE_ERROR_SIGNATURE');
+    pushCode(codes, 'SAME_ERROR_FINGERPRINT');
+  }
   if (signals.same_error_ratio !== null && signals.same_error_ratio < 0.5 && signals.fail_count >= 2) {
     pushCode(codes, 'CHANGING_ERROR_SIGNATURE');
+    pushCode(codes, 'CHANGED_ERROR_FINGERPRINT');
   }
   if (signals.environment_marker_hits.length) pushCode(codes, 'ENVIRONMENT_MARKERS');
   if (signals.environment_marker_hits.includes('timeout')) pushCode(codes, 'TIMEOUT_MARKERS');
@@ -92,7 +103,10 @@ export function buildClassifications(input: {
       confidence: Math.min(input.confidence || heuristic.confidence, 1),
       reason_codes: codes,
       evidence: signals,
-      error_digest: digestError(test.error_message ?? test.stack_snippet),
+      error_digest: fingerprintTestResult(test),
+      heuristic_failure_type: heuristic.failure_type,
+      heuristic_confidence: heuristic.confidence,
+      suggested_action: suggestedActionFor(heuristic.failure_type, heuristic.confidence),
     };
   });
 }
@@ -205,6 +219,10 @@ export function applyPolicy(input: {
     primary = majorityType(classifications.filter(row => row.failure_type !== 'unknown')) || majorityType(classifications);
   }
 
+  const heuristicPrimary = majorityType(
+    classifications.map(row => ({ ...row, failure_type: row.heuristic_failure_type })),
+  );
+
   const summary = sanitizeSummary(
     decision === 'CLASSIFY'
       ? `Classified ${classifications.length} test(s); primary failure_type=${primary} (confidence=${confidence.toFixed(2)}).`
@@ -224,6 +242,8 @@ export function applyPolicy(input: {
     provider: input.provider,
     jev_status: jevStatus,
     jev_proposed: jevProposed,
+    heuristic_failure_type: heuristicPrimary,
+    suggested_action: suggestedActionFor(primary, confidence),
   });
 
   return {

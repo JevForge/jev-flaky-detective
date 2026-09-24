@@ -61,12 +61,16 @@ describe('executors + outputs', () => {
   const decision: DetectiveDecision = {
     decision: 'CLASSIFY',
     failure_type: 'flaky',
+    heuristic_failure_type: 'flaky',
     classifications: [
       {
         test_id: 't1',
         failure_type: 'flaky',
         confidence: 0.9,
         reason_codes: ['NEVER_RERUN', 'NEVER_MASK', 'CLASSIFIED_FLAKY'],
+        heuristic_failure_type: 'flaky',
+        heuristic_confidence: 0.9,
+        suggested_action: 'ignore-for-gate',
       },
     ],
     confidence: 0.9,
@@ -75,6 +79,7 @@ describe('executors + outputs', () => {
     provisional: false,
     jev_status: 'evaluated',
     jev_proposed: 'flaky',
+    suggested_action: 'ignore-for-gate',
   };
 
   it('renders comment and posts via client', async () => {
@@ -108,6 +113,7 @@ describe('executors + outputs', () => {
         environment_marker_tests: 0,
         changed_path_overlap_tests: 0,
         adapter_sources: [],
+        duration_ms: 0,
       },
     });
     expect(paths.markdownPath).toContain('flaky-detective.md');
@@ -126,6 +132,7 @@ describe('executors + outputs', () => {
         environment_marker_tests: 0,
         changed_path_overlap_tests: 0,
         adapter_sources: ['junit'],
+        duration_ms: 0,
       },
       actionStatus: 'ok',
       needsReview: false,

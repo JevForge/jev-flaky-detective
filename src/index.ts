@@ -69,6 +69,7 @@ async function main(): Promise<void> {
     vitestPath: core.getInput('vitest_path') || undefined,
     mochaPath: core.getInput('mocha_path') || undefined,
     changedPathsRaw: core.getInput('changed_paths') || undefined,
+    maxReportBytes: numInput('max_report_size_mb', 10) * 1024 * 1024,
   });
 
   const token = core.getInput('github_token') || process.env.GITHUB_TOKEN || '';
@@ -235,6 +236,7 @@ async function main(): Promise<void> {
       source_error_policy: enumInput('source_error_policy', SOURCE_ERROR_POLICIES, 'warn' as SourceErrorPolicy),
       max_tests: numInput('max_tests', 500),
       max_tests_to_jev: numInput('max_tests_to_jev', 25),
+      max_report_size_mb: numInput('max_report_size_mb', 10),
       history_lookback: numInput('history_lookback', 20),
       comment_on_github: boolInput('comment_on_github', false),
       create_check_run: boolInput('create_check_run', true),
@@ -267,6 +269,9 @@ async function main(): Promise<void> {
         provisional: result.outcome.decision.provisional,
         provider: providerId,
         tests: result.evidence.tests_considered,
+        duration_ms: result.evidence.duration_ms,
+        adapter_sources: result.evidence.adapter_sources,
+        history_runs: result.evidence.history_runs,
       }),
     );
   }

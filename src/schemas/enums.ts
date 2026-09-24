@@ -25,6 +25,9 @@ export type JevStatus = (typeof JEV_STATUSES)[number];
 export const DECISION_MODES = ['jev', 'deterministic'] as const;
 export type DecisionMode = (typeof DECISION_MODES)[number];
 
+export const SUGGESTED_ACTIONS = ['triage', 'ignore-for-gate', 'investigate-env'] as const;
+export type SuggestedAction = (typeof SUGGESTED_ACTIONS)[number];
+
 export const REASON_CODES = [
   'CURRENT_FAILURE',
   'CURRENT_PASS',
@@ -38,6 +41,8 @@ export const REASON_CODES = [
   'FIRST_FAILURE',
   'STABLE_ERROR_SIGNATURE',
   'CHANGING_ERROR_SIGNATURE',
+  'SAME_ERROR_FINGERPRINT',
+  'CHANGED_ERROR_FINGERPRINT',
   'ENVIRONMENT_MARKERS',
   'TIMEOUT_MARKERS',
   'RESOURCE_MARKERS',

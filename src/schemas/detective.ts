@@ -10,6 +10,7 @@ import {
   REASON_CODES,
   SOURCE_ERROR_POLICIES,
   TEST_STATUSES,
+  SUGGESTED_ACTIONS,
 } from './enums.js';
 
 export const TestResultSchema = z.object({
@@ -67,6 +68,9 @@ export const ClassificationSchema = z.object({
   reason_codes: z.array(z.enum(REASON_CODES)).max(24),
   evidence: TestSignalsSchema.partial().optional(),
   error_digest: z.string().max(256).optional(),
+  heuristic_failure_type: z.enum(FAILURE_TYPES),
+  heuristic_confidence: z.number().min(0).max(1),
+  suggested_action: z.enum(SUGGESTED_ACTIONS),
 });
 export type Classification = z.infer<typeof ClassificationSchema>;
 
@@ -81,6 +85,8 @@ export const DetectiveDecisionSchema = z.object({
   provider: z.enum(JEV_PROVIDERS).optional(),
   jev_status: z.enum(JEV_STATUSES),
   jev_proposed: z.enum(FAILURE_TYPES).nullable(),
+  heuristic_failure_type: z.enum(FAILURE_TYPES),
+  suggested_action: z.enum(SUGGESTED_ACTIONS),
 });
 export type DetectiveDecision = z.infer<typeof DetectiveDecisionSchema>;
 
@@ -101,6 +107,7 @@ export const RunOptionsSchema = z.object({
   source_error_policy: z.enum(SOURCE_ERROR_POLICIES).default('warn'),
   max_tests: z.number().int().positive().max(5000).default(500),
   max_tests_to_jev: z.number().int().positive().max(100).default(25),
+  max_report_size_mb: z.number().positive().max(100).default(10),
   history_lookback: z.number().int().positive().max(50).default(20),
   comment_on_github: z.boolean().default(false),
   create_check_run: z.boolean().default(true),
@@ -121,6 +128,7 @@ export const EvidenceSummarySchema = z.object({
   environment_marker_tests: z.number().int().nonnegative(),
   changed_path_overlap_tests: z.number().int().nonnegative(),
   adapter_sources: z.array(z.string()).max(16),
+  duration_ms: z.number().nonnegative(),
 });
 export type EvidenceSummary = z.infer<typeof EvidenceSummarySchema>;
 

@@ -47,6 +47,7 @@ export interface RunDetectiveResult {
 }
 
 export async function runDetective(params: RunDetectiveParams): Promise<RunDetectiveResult> {
+  const startedAt = Date.now();
   const options = RunOptionsSchema.parse(params.options);
 
   let tests = [...params.current];
@@ -137,6 +138,7 @@ export async function runDetective(params: RunDetectiveParams): Promise<RunDetec
     environment_marker_tests: state.aggregate.environment_marker_tests,
     changed_path_overlap_tests: signals.filter(signal => signal.changed_path_overlap).length,
     adapter_sources: params.adapterSources,
+    duration_ms: Date.now() - startedAt,
   });
 
   const effects = planEffects({

@@ -51,6 +51,8 @@ export function emitOutputs(input: {
     provisional: String(decision.provisional),
     jev_status: decision.jev_status,
     jev_proposed: decision.jev_proposed ?? '',
+    heuristic_failure_type: decision.heuristic_failure_type,
+    suggested_action: decision.suggested_action,
     needs_review: String(input.needsReview),
     tests_count: String(input.evidence.tests_considered),
     failing_count: String(input.evidence.failing_count),

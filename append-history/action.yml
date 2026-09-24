@@ -7,7 +7,7 @@ branding:
 
 inputs:
   results:
-    description: Inline JSON of current TestResult[] (or { results }).
+    description: 'Inline JSON of current TestResult[] (or { results }).'
     required: false
   results_path:
     description: Workspace path to normalized results JSON.

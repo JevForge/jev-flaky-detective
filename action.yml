@@ -7,13 +7,13 @@ branding:
 
 inputs:
   results:
-    description: Inline JSON of current test results (TestResult[] or { results: TestResult[] }).
+    description: 'Inline JSON of current test results (TestResult[] or { results: TestResult[] }).'
     required: false
   results_path:
     description: Workspace path(s) to normalized results JSON. Comma/newline list or glob.
     required: false
   history:
-    description: Inline JSON of historical runs (HistoryRun[] or { runs: HistoryRun[] }).
+    description: 'Inline JSON of historical runs (HistoryRun[] or { runs: HistoryRun[] }).'
     required: false
   history_path:
     description: Workspace JSON of historical runs. Default .jev/test-history.json when fetch_github_history is false.
@@ -110,6 +110,10 @@ inputs:
     description: How many tests are sampled for a single Jev call.
     required: false
     default: '25'
+  max_report_size_mb:
+    description: Maximum size in MiB for each configured report or history file before SOURCE_UNAVAILABLE.
+    required: false
+    default: '10'
   comment_on_github:
     description: Post or update an idempotent PR/issue summary comment.
     required: false
@@ -160,6 +164,10 @@ outputs:
     description: evaluated | unavailable | schema_rejected
   jev_proposed:
     description: Failure type proposed by Jev, or empty when Jev did not evaluate.
+  heuristic_failure_type:
+    description: Primary failure type suggested by local heuristics, exposed beside jev_proposed.
+  suggested_action:
+    description: Signal-only next action enum; triage | ignore-for-gate | investigate-env. Never changes the test gate.
   needs_review:
     description: true when request-review policy applied.
   tests_count:

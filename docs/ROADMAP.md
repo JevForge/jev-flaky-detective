@@ -1,5 +1,7 @@
 # Improvement roadmap — release plan
 
+This development slice implements roadmap items 4 through 12 together. The release tag remains a separate operator action after CI and review.
+
 Each item ships as its **own PR** (atomic commit), is **merged to `main`**, then gets a **full Release** via `jev-release-forge` (`workflow_dispatch`). No squashing unrelated work into one push.
 
 | # | Version | Branch | Scope |
