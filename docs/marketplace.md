@@ -1,7 +1,28 @@
-# Marketplace listing (draft)
+# Marketplace readiness
 
-**Name:** JEV Flaky Detective  
-**Categories:** Continuous integration, Code quality  
-**Summary:** Classify CI test failures as regression, flaky, environment, or unknown with typed Jev decisions — without auto-reruns or masked results.
+## Short description (≤125 characters)
 
-Do not publish to the GitHub Marketplace until an explicit organization approval.
+```text
+Classify failing tests as regression, flaky, environment, or unknown. Jev decides; results are never masked or auto-rerun.
+```
+
+Length: 122 characters.
+
+## Listing fields
+
+| Field | Value |
+| --- | --- |
+| Name | JEV Flaky Detective |
+| Primary category | Continuous integration |
+| Secondary category | Code quality |
+| Branding | `search` / `yellow` in `action.yml` |
+| Pricing | Free (MIT) |
+
+## Publish checklist
+
+1. Public repository with root `action.yml` — done.
+2. GitHub Release with a semver tag (`v0.1.0` or later) — use the Release workflow (`jev-release-forge`).
+3. Accept the GitHub Marketplace Developer Agreement for the JevForge org (one-time).
+4. Edit the latest release → check **Publish this Action to the GitHub Marketplace** → choose categories → update release (requires 2FA; cannot run in CI).
+
+Trigger a release from Actions → Release → Run workflow with version `X.Y.Z`.
