@@ -85,10 +85,32 @@ export async function runDetective(params: RunDetectiveParams): Promise<RunDetec
     maxSample: options.max_tests_to_jev,
   });
 
-  const jev = await params.provider.evaluateFailure({
-    state,
-    questions: buildFailureQuestions(),
-  });
+  let baseReasonCodes = [...params.baseReasonCodes];
+  let jev;
+  if (options.decision_mode === 'deterministic') {
+    baseReasonCodes.push('DETERMINISTIC_ONLY');
+    const counts: Record<string, number> = { regression: 0, flaky: 0, environment: 0, unknown: 0 };
+    let confSum = 0;
+    for (const row of heuristics) {
+      counts[row.failure_type] = (counts[row.failure_type] ?? 0) + 1;
+      confSum += row.confidence;
+    }
+    const failure_type = (Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+      'unknown') as 'regression' | 'flaky' | 'environment' | 'unknown';
+    const confidence = heuristics.length === 0 ? 0 : confSum / heuristics.length;
+    jev = {
+      status: 'evaluated' as const,
+      failure_type,
+      confidence,
+      abstain: false,
+      explanation: 'Deterministic heuristics only (decision_mode=deterministic)',
+    };
+  } else {
+    jev = await params.provider.evaluateFailure({
+      state,
+      questions: buildFailureQuestions(),
+    });
+  }
 
   const outcome = applyPolicy({
     tests,
@@ -99,7 +121,7 @@ export async function runDetective(params: RunDetectiveParams): Promise<RunDetec
     sourceErrorPolicy: options.source_error_policy,
     sourceErrors: params.sourceErrors,
     truncated,
-    baseReasonCodes: params.baseReasonCodes,
+    baseReasonCodes,
     provider: params.providerId,
   });
 

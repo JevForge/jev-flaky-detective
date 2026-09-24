@@ -23869,6 +23869,7 @@ var LOW_CONFIDENCE_POLICIES = ["fail", "warn", "request-review", "no-op"];
 var SOURCE_ERROR_POLICIES = ["fail", "warn"];
 var ENVIRONMENTS = ["production", "staging", "development", "test", "ci", "unknown"];
 var JEV_STATUSES = ["evaluated", "unavailable", "schema_rejected"];
+var DECISION_MODES = ["jev", "deterministic"];
 var REASON_CODES = [
   "CURRENT_FAILURE",
   "CURRENT_PASS",
@@ -23911,7 +23912,8 @@ var REASON_CODES = [
   "CLASSIFIED_ENVIRONMENT",
   "CLASSIFIED_UNKNOWN",
   "NEVER_RERUN",
-  "NEVER_MASK"
+  "NEVER_MASK",
+  "DETERMINISTIC_ONLY"
 ];
 
 // src/schemas/detective.ts
@@ -23997,7 +23999,8 @@ var RunOptionsSchema = external_exports.object({
   create_check_run: external_exports.boolean().default(true),
   write_report_artifact: external_exports.boolean().default(false),
   structured_logs: external_exports.boolean().default(false),
-  dry_run: external_exports.boolean().default(false)
+  dry_run: external_exports.boolean().default(false),
+  decision_mode: external_exports.enum(DECISION_MODES).default("jev")
 });
 var EvidenceSummarySchema = external_exports.object({
   tests_considered: external_exports.number().int().nonnegative(),

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.2.2]
+
+### Added
+
+* `decision_mode: jev | deterministic` — deterministic classifies from local signals without calling Jev (`DETERMINISTIC_ONLY`).
+
 ## [0.2.1]
 
 ### Added

@@ -22,6 +22,9 @@ export type Environment = (typeof ENVIRONMENTS)[number];
 export const JEV_STATUSES = ['evaluated', 'unavailable', 'schema_rejected'] as const;
 export type JevStatus = (typeof JEV_STATUSES)[number];
 
+export const DECISION_MODES = ['jev', 'deterministic'] as const;
+export type DecisionMode = (typeof DECISION_MODES)[number];
+
 export const REASON_CODES = [
   'CURRENT_FAILURE',
   'CURRENT_PASS',
@@ -65,6 +68,7 @@ export const REASON_CODES = [
   'CLASSIFIED_UNKNOWN',
   'NEVER_RERUN',
   'NEVER_MASK',
+  'DETERMINISTIC_ONLY',
 ] as const;
 export type ReasonCode = (typeof REASON_CODES)[number];
 

@@ -72,6 +72,10 @@ inputs:
     description: Minimum Jev confidence (0-1) required to trust CLASSIFY.
     required: false
     default: '0.7'
+  decision_mode:
+    description: jev (default) asks Jev; deterministic classifies from local signals only without calling Jev.
+    required: false
+    default: jev
   low_confidence_policy:
     description: fail | warn | request-review | no-op when Jev is unavailable, rejected, or below min_confidence.
     required: false
