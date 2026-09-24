@@ -37,7 +37,7 @@ inputs:
     description: Optional architecture label (x64, arm64, unknown).
     required: false
   changed_paths:
-    description: JSON array or newline list of changed paths. Used as regression evidence.
+    description: JSON array or newline list of changed paths. On pull_request, loaded from the API when omitted.
     required: false
   junit_path:
     description: Workspace path(s) to JUnit XML reports (pytest, Surefire, etc.). Comma/newline/glob.
